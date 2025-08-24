@@ -4,7 +4,7 @@ metadata:
   name: ai-app
   namespace: devops-ai
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: ai-app
