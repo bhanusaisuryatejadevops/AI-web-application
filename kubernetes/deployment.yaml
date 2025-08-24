@@ -18,11 +18,6 @@ spec:
           image: 321858344734.dkr.ecr.us-west-2.amazonaws.com/devops-ai-app:latest
           ports:
             - containerPort: 8000
-          env:
-            - name: TEXT_API_URL
-              value: "http://text-processing.com/api/sentiment/"
-            - name: EXTERNAL_API_TIMEOUT
-              value: "10"
           resources:
             requests:
               cpu: "250m"
@@ -30,6 +25,11 @@ spec:
             limits:
               cpu: "500m"
               memory: "1Gi"
+          env:
+            - name: TEXT_API_URL
+              value: "http://text-processing.com/api/sentiment/"
+            - name: EXTERNAL_API_TIMEOUT
+              value: "10"
           readinessProbe:
             httpGet:
               path: /healthz
@@ -40,5 +40,5 @@ spec:
             httpGet:
               path: /healthz
               port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            initialDelaySeconds: 15
+            periodSeconds: 10

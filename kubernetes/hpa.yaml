@@ -9,12 +9,11 @@ spec:
     kind: Deployment
     name: ai-app
   minReplicas: 2
-  maxReplicas: 6
+  maxReplicas: 5
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 70
-
+          averageUtilization: 50
