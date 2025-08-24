@@ -1,32 +1,37 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 import requests
-import os
 
 app = Flask(__name__)
 
-TEXT_API_URL = os.getenv("TEXT_API_URL", "http://text-processing.com/api/sentiment/")
-TIMEOUT = int(os.getenv("EXTERNAL_API_TIMEOUT", "10"))
+# Health Check
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"message": "AI App is running!"})
 
-@app.route("/")
-def index():
-    return jsonify({"message": "AI App is running!"}), 200
-
+# Sentiment Analysis Endpoint
 @app.route("/analyze", methods=["POST"])
-def analyze_sentiment():
-    try:
-        data = request.json
-        text = data.get("text", "")
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
+def analyze():
+    data = request.get_json()
+    if not data or "text" not in data:
+        return jsonify({"error": "Text is required"}), 400
 
-        response = requests.post(TEXT_API_URL, data={"text": text}, timeout=TIMEOUT)
-        return jsonify(response.json()), response.status_code
+    text = data["text"]
+
+    # External API for sentiment analysis
+    try:
+        response = requests.post(
+            "http://text-processing.com/api/sentiment/",
+            data={"text": text},
+            timeout=10
+        )
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify(result)
+        else:
+            return jsonify({"error": "External API error"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/healthz")
-def healthz():
-    return jsonify({"status": "ok"}), 200
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
+
