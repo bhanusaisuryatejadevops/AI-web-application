@@ -1,0 +1,76 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/devops-ai-app
+  REGISTRY: docker.io
+
+jobs:
+  test-build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Write kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Set image in manifests
+        run: |
+          sed -i "s|IMAGE_PLACEHOLDER|${{ env.IMAGE_NAME }}:latest|g" kubernetes/deployment.yaml
+
+      - name: Deploy to Kubernetes
+        uses: azure/k8s-deploy@v5
+        with:
+          manifests: |
+            kubernetes/namespace.yaml
+            kubernetes/deployment.yaml
+            kubernetes/service.yaml
+            kubernetes/hpa.yaml
+            kubernetes/ingress.yaml
+          images: |
+            ${{ env.IMAGE_NAME }}:latest
+          namespace: devops-ai
+
+      - name: Rollback manifest image placeholder
+        if: always()
+        run: |
+          git checkout -- kubernetes/deployment.yaml
