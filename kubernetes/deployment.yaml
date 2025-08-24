@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: ai-app
   namespace: devops-ai
-  labels:
-    app: ai-app
 spec:
   replicas: 2
   selector:
@@ -17,36 +15,26 @@ spec:
     spec:
       containers:
         - name: ai-app
-          image: IMAGE_PLACEHOLDER
-          imagePullPolicy: IfNotPresent
+          image: 321858344734.dkr.ecr.us-west-2.amazonaws.com/devops-ai-app:latest # Replace with your ECR image
           ports:
-            - containerPort: 8000
-          env:
-            - name: HUGGINGFACE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: ai-secrets
-                  key: hf_api_token
-            - name: HUGGINGFACE_API_URL
-              value: "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
-            - name: EXTERNAL_API_TIMEOUT
-              value: "20"
+            - containerPort: 80
           resources:
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: "250m"
+              memory: "512Mi"
             limits:
               cpu: "500m"
-              memory: "512Mi"
+              memory: "1Gi"
           readinessProbe:
             httpGet:
-              path: /healthz
-              port: 8000
-            initialDelaySeconds: 5
+              path: /
+              port: 80
+            initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /healthz
-              port: 8000
-            initialDelaySeconds: 10
+              path: /
+              port: 80
+            initialDelaySeconds: 15
             periodSeconds: 10
+
