@@ -1,45 +1,67 @@
-name: Deploy to EKS
+name: CI/CD - AI App to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: us-west-2
+      EKS_CLUSTER_NAME: main-cluster
+      ECR_REPOSITORY: devops-ai-app
+      IMAGE_TAG: latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
-          docker build -t ai-web-app:latest .
-
-      - name: Tag Docker image
-        run: |
-          docker tag ai-web-app:latest ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPO_NAME }}:latest
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ vars.ECR_REPO_NAME }}:latest
+          REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_NAME }} --region ${{ vars.AWS_REGION }}
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
 
-      - name: Deploy to EKS
+      - name: Deploy Kubernetes Manifests
         run: |
-          kubectl apply -f kubernetes/
+          kubectl apply -f kubernetes/namespace.yaml
+          kubectl apply -f kubernetes/deployment.yaml
+          kubectl apply -f kubernetes/service.yaml
+          kubectl apply -f kubernetes/hpa.yaml
+          kubectl rollout status deployment/ai-app -n devops-ai --timeout=120s
+
+      - name: Show Service External IP
+        run: |
+          echo "Waiting for LoadBalancer EXTERNAL-IP..."
+          for i in {1..30}; do
+            kubectl get svc ai-app-svc -n devops-ai
+            EXTERNAL=$(kubectl get svc ai-app-svc -n devops-ai -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [ -n "$EXTERNAL" ]; then
+              echo "Service is available at: http://$EXTERNAL"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for LoadBalancer external IP"
+          exit 1
 
