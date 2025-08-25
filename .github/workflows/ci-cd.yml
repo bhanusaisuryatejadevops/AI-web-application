@@ -1,43 +1,52 @@
-name: Build and Deploy AI App
+name: Build and Deploy to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "321858344734"
+  ECR_REPOSITORY: "devops-ai-app"
+  EKS_CLUSTER_NAME: "main-cluster"
+  K8S_NAMESPACE: "devops-ai"
+  IMAGE_TAG: "latest"
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        run: |
-          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 321858344734.dkr.ecr.us-west-2.amazonaws.com
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
+      - name: Build and push image
         run: |
-          docker build -t devops-ai-app:latest .
+          REPO="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+          docker build -t "$REPO:${{ env.IMAGE_TAG }}" .
+          docker push "$REPO:${{ env.IMAGE_TAG }}"
 
-      - name: Tag and Push to ECR
+      - name: Update kubeconfig
         run: |
-          docker tag devops-ai-app:latest 321858344734.dkr.ecr.us-west-2.amazonaws.com/devops-ai-app:latest
-          docker push 321858344734.dkr.ecr.us-west-2.amazonaws.com/devops-ai-app:latest
+          aws eks update-kubeconfig --name "${{ env.EKS_CLUSTER_NAME }}" --region "${{ env.AWS_REGION }}"
 
-      - name: Update Kubernetes
+      - name: Apply manifests
         run: |
-          aws eks update-kubeconfig --name main-cluster --region us-west-2
-          kubectl apply -f kubernetes/namespace.yaml
-          kubectl apply -f kubernetes/deployment.yaml
-          kubectl apply -f kubernetes/service.yaml
-          kubectl apply -f kubernetes/hpa.yaml
-          kubectl rollout status deployment/ai-app -n devops-ai
+          kubectl apply -f kubernetes/manifest.yaml
+          kubectl rollout status deploy/ai-app -n "${{ env.K8S_NAMESPACE }}" --timeout=180s
+          kubectl get svc ai-app-svc -n "${{ env.K8S_NAMESPACE }}"
