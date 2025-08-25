@@ -18,13 +18,12 @@ def analyze():
         return jsonify({"error": "Text input is required"}), 400
 
     try:
-        response = requests.post(TEXT_API_URL, data={"text": data["text"]}, timeout=EXTERNAL_API_TIMEOUT)
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        payload = {"text": data["text"]}
+        response = requests.post(TEXT_API_URL, data=payload, headers=headers, timeout=EXTERNAL_API_TIMEOUT)
         if response.status_code == 200:
             return jsonify({"input": data["text"], "result": response.json()})
         else:
             return jsonify({"error": "AI API error", "status": response.status_code}), response.status_code
     except requests.exceptions.RequestException as e:
         return jsonify({"error": "External API call failed", "details": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
