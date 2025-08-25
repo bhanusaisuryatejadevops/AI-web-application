@@ -47,6 +47,6 @@ jobs:
 
       - name: Apply manifests
         run: |
-          kubectl apply -f kubernetes/ *
+          kubectl apply -f kubernetes/
           kubectl rollout status deploy/ai-app -n "${{ env.K8S_NAMESPACE }}" --timeout=180s
           kubectl get svc ai-app-svc -n "${{ env.K8S_NAMESPACE }}"
