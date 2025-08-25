@@ -1,13 +1,9 @@
 from flask import Flask, request, jsonify
-import requests
-import os
+from textblob import TextBlob
 
 app = Flask(__name__)
 
-TEXT_API_URL = os.getenv("TEXT_API_URL", "http://text-processing.com/api/sentiment/")
-EXTERNAL_API_TIMEOUT = int(os.getenv("EXTERNAL_API_TIMEOUT", 10))
-
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return jsonify({"message": "AI App is running!"})
 
@@ -17,13 +13,16 @@ def analyze():
     if not data or "text" not in data:
         return jsonify({"error": "Text input is required"}), 400
 
-    try:
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        payload = {"text": data["text"]}
-        response = requests.post(TEXT_API_URL, data=payload, headers=headers, timeout=EXTERNAL_API_TIMEOUT)
-        if response.status_code == 200:
-            return jsonify({"input": data["text"], "result": response.json()})
-        else:
-            return jsonify({"error": "AI API error", "status": response.status_code}), response.status_code
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": "External API call failed", "details": str(e)}), 500
+    text = data["text"]
+    blob = TextBlob(text)
+    sentiment = blob.sentiment.polarity  # value between -1 (negative) and 1 (positive)
+
+    result = {
+        "input": text,
+        "sentiment": "positive" if sentiment > 0 else "negative" if sentiment < 0 else "neutral",
+        "score": sentiment
+    }
+    return jsonify(result)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
