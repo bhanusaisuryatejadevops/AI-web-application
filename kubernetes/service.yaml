@@ -3,11 +3,13 @@ kind: Service
 metadata:
   name: ai-app-svc
   namespace: devops-ai
+  labels:
+    app: ai-app
 spec:
   selector:
     app: ai-app
   ports:
     - protocol: TCP
-      port: 80
+      port: 8000
       targetPort: 8000
   type: LoadBalancer

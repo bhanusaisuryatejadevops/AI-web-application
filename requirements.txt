@@ -1,3 +1,4 @@
-flask
+Flask
 textblob
 gunicorn
+prometheus-flask-exporter

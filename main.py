@@ -1,7 +1,12 @@
 from flask import Flask, request, jsonify
 from textblob import TextBlob
+from prometheus_flask_exporter import PrometheusMetrics
 
 app = Flask(__name__)
+
+# Attach Prometheus monitoring
+metrics = PrometheusMetrics(app)
+metrics.info("app_info", "AI Web Application", version="1.0.0")
 
 @app.route("/")
 def home():
