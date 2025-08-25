@@ -7,22 +7,24 @@ app = Flask(__name__)
 def home():
     return jsonify({"message": "AI App is running!"})
 
-@app.route("/analyze", methods=["POST"])
+@app.route("/analyze", methods=["GET", "POST"])
 def analyze():
-    data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": "Text input is required"}), 400
+    if request.method == "GET":
+        text = request.args.get("text")
+        if not text:
+            return jsonify({"error": "Text input is required"}), 400
+    else:
+        data = request.get_json()
+        if not data or "text" not in data:
+            return jsonify({"error": "Text input is required"}), 400
+        text = data["text"]
 
-    text = data["text"]
     blob = TextBlob(text)
-    sentiment = blob.sentiment.polarity  # value between -1 (negative) and 1 (positive)
+    sentiment = blob.sentiment.polarity
 
     result = {
         "input": text,
         "sentiment": "positive" if sentiment > 0 else "negative" if sentiment < 0 else "neutral",
-        "score": sentiment
+        "score": round(sentiment, 3)
     }
     return jsonify(result)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
