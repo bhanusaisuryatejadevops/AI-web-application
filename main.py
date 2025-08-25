@@ -30,6 +30,7 @@ def analyze():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# ✅ Simple Web UI
 @app.route("/ui", methods=["GET", "POST"])
 def ui():
     if request.method == "POST":
@@ -63,6 +64,3 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
