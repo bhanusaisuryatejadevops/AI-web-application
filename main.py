@@ -1,50 +1,33 @@
 from flask import Flask, request, jsonify
-import os, requests
+import requests
+import os
 
 app = Flask(__name__)
 
 TEXT_API_URL = os.getenv("TEXT_API_URL", "http://text-processing.com/api/sentiment/")
-API_TIMEOUT = int(os.getenv("EXTERNAL_API_TIMEOUT", "10"))
 
-@app.get("/")
-def root():
-    return jsonify({"message": "AI App is running!"}), 200
+@app.route("/")
+def home():
+    return jsonify({"message": "AI App is running!"})
 
-@app.get("/healthz")
-def healthz():
-    return "ok", 200
-
-@app.post("/analyze")
+@app.route("/analyze", methods=["GET"])
 def analyze():
-    # Accepts JSON: {"text": "..."} or form-encoded "text=..."
-    text = None
-    if request.is_json:
-        body = request.get_json(silent=True) or {}
-        text = body.get("text")
+    text = request.args.get("text")
     if not text:
-        text = request.form.get("text")
-
-    if not text:
-        return jsonify({"error": "Missing 'text'"}), 400
+        return jsonify({"error": "Please provide text parameter"}), 400
 
     try:
-        # text-processing.com expects form-encoded body
-        resp = requests.post(
-            TEXT_API_URL,
-            data={"text": text},
-            timeout=API_TIMEOUT,
-        )
-        resp.raise_for_status()
-        # Response example: {"label": "pos", "probability": {...}}
-        data = resp.json()
-        label_map = {"pos": "positive", "neg": "negative", "neutral": "neutral"}
-        label = label_map.get(data.get("label"), data.get("label"))
-        return jsonify({"text": text, "sentiment": label, "raw": data}), 200
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "Upstream timeout"}), 504
+        response = requests.post(TEXT_API_URL, data={"text": text})
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                "input": text,
+                "sentiment": result.get("label")
+            })
+        else:
+            return jsonify({"error": "AI API error", "status": response.status_code}), 500
     except Exception as e:
-        return jsonify({"error": f"Upstream failure: {str(e)}"}), 502
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    # for local testing only; in k8s we use gunicorn
     app.run(host="0.0.0.0", port=8000)
