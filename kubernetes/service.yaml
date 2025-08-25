@@ -4,10 +4,10 @@ metadata:
   name: ai-app-svc
   namespace: devops-ai
 spec:
-  type: LoadBalancer
   selector:
     app: ai-app
   ports:
-    - name: http
+    - protocol: TCP
       port: 80
       targetPort: 8000
+  type: LoadBalancer
