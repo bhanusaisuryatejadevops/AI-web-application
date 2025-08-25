@@ -10,22 +10,19 @@ TEXT_API_URL = os.getenv("TEXT_API_URL", "http://text-processing.com/api/sentime
 def home():
     return jsonify({"message": "AI App is running!"})
 
-@app.route("/analyze", methods=["GET"])
+@app.route("/analyze", methods=["POST"])
 def analyze():
-    text = request.args.get("text")
-    if not text:
-        return jsonify({"error": "Please provide text parameter"}), 400
+    data = request.get_json()
+    if not data or "text" not in data:
+        return jsonify({"error": "Text input is required"}), 400
 
+    text = data["text"]
     try:
         response = requests.post(TEXT_API_URL, data={"text": text})
         if response.status_code == 200:
-            result = response.json()
-            return jsonify({
-                "input": text,
-                "sentiment": result.get("label")
-            })
+            return jsonify(response.json())
         else:
-            return jsonify({"error": "AI API error", "status": response.status_code}), 500
+            return jsonify({"error": "AI API error", "status": response.status_code}), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
